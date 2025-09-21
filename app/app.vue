@@ -55,8 +55,8 @@ onUnmounted(() => {
       </div>
       <div class="grid grid-cols-2 gap-4 mb-8">
         <div class="text-center justify-end flex" v-for="(box, index) in boxes" :key="index">
-          <div class="flex flex-col items-center justify-start justify-items-center mr-2">
-            <img src="/box.jpg" class="h-4/5 w-4/5">
+          <div class="flex flex-col items-center mr-2 w-full">
+            <img src="/box.jpg" class="h-12 w-16">
             <h1 class="tracking-tighter font-thin text-sm"> {{ box.name }} </h1>
           </div>
           <UButton class="self-start justify-self-end flex" icon="i-humbleicons-times" @click="removeBox(box.id)" size="md" color="error" variant="solid" />
