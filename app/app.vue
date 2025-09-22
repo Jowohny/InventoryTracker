@@ -10,7 +10,7 @@ interface BoxItem {
 interface Audit {
   name: string,
   action: string,
-  container: Box,
+  container: Box | null,
   logTime: Date
 }
 
@@ -36,15 +36,50 @@ interface Box {
 
 let boxes = ref<Box[]>([])
 let auditLogs = ref<Audit[]>([])
+const editAccess = ref(false)
+const validName = ref(false)
 const boxNameInput = ref('')
 const openDrawer = ref(false)
-const openModel1st = ref(false)
-const openModel2nd = ref(false)
+const openContainer1st = ref(false)
+const openContainer2nd = ref(false)
+const openAudit1st = ref(false)
+const openAudit2nd = ref(false)
 const userNameInput = ref('')
+const auditPage = ref(1)
+const itemsPerPage = 10
+
+watch(userNameInput, (newUser) => {
+  $locally.setItem('lastUser', newUser)
+})
 
 const sortedBoxes = computed(() => {
   return [...boxes.value].sort((a, b) => a.name.localeCompare(b.name))
 })
+
+const sortedAudit = computed(() => {
+  return [...auditLogs.value].sort((a, b) => b.logTime.getTime() - a.logTime.getTime())
+})
+
+const paginatedAudits = computed(() => {
+  const startIndex = (auditPage.value - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  return sortedAudit.value.slice(startIndex, endIndex)
+})
+
+watch(sortedAudit, (list) => {
+  const maxPage = Math.max(1, Math.ceil(list.length / itemsPerPage))
+  if (auditPage.value > maxPage) {
+    auditPage.value = maxPage
+  }
+})
+
+watch(userNameInput, (user) => {
+  editAccess.value = user.trim().length > 0;
+});
+
+watch(boxNameInput, (vName) => {
+  validName.value = vName.trim().length > 2;
+});
 
 onMounted(() => {
   const storedBoxes = $locally.getItem('boxes')
@@ -59,18 +94,24 @@ onMounted(() => {
     auditLogs.value = storedAudits.map((a: Audit) => ({
       ...a,
       logTime: new Date(a.logTime),
-      container: { ...a.container, created: new Date(a.container.created) }
+      container: a.container ? { ...a.container, created: new Date(a.container.created) } : a.container
     }))
+  }
+  const storedUser = $locally.getItem('lastUser')
+  if (storedUser) {
+    userNameInput.value = storedUser
   }
 })
 
 const removeBox = (id: number) => {
+  const removed: Box = boxes.value.filter(box => box.id === id)[0]!
   boxes.value = boxes.value.filter(box => box.id !== id)
   $locally.setItem('boxes', boxes.value)
+  addAuditEntry('removeContainer', removed)
 }
 
 const addBox = () => {
-  const boxFilter = boxes.value.filter(box => (box.name.toLowerCase().replace(/[^a-zA-Z0-9]/g, '')).includes(boxNameInput.value.toLowerCase().replace(/[^a-zA-Z0-9]/g, '')))
+  const boxFilter = boxes.value.filter(box => (box.name.toLowerCase().trim()).includes(boxNameInput.value.toLowerCase().trim()))
 
   if(boxFilter.length > 0) {
     const newBox: Box = {
@@ -98,11 +139,25 @@ const addBox = () => {
 const clearInventory = () => {
   boxes.value = []
   $locally.setItem('boxes', boxes.value)
-  openModel1st.value = false
-  openModel2nd.value = false
+  openContainer1st.value = false
+  openContainer2nd.value = false
+  addAuditEntry('clearAll', null)
 }
 
-const addAuditEntry = (entryType: string, secondaryInput: Box) => {
+const clearAuditLogs = () => {
+  auditLogs.value = []
+  const newAudit: Audit = {
+    name: userNameInput.value,
+    action: 'cleared all audit logs',
+    container: null,
+    logTime: new Date(Date.now())
+
+  }
+  auditLogs.value.push(newAudit)
+  $locally.setItem('auditLogs', auditLogs.value)
+}
+
+const addAuditEntry = (entryType: string, secondaryInput: Box | null) => {
   if(entryType === 'addContainer') {
     const newAudit: Audit = {
       name: userNameInput.value,
@@ -157,7 +212,7 @@ onUnmounted(() => {
             <img src="/box.jpg" class="h-12 w-16">
             <h1 class="tracking-tighter font-thin text-sm"> {{ box.name }} </h1>
           </div>
-          <UButton class="self-start justify-self-end flex" icon="i-humbleicons-times" @click="removeBox(box.id)" size="md" color="error" variant="solid" />
+          <UButton class="self-start justify-self-end flex" :disabled="!editAccess" icon="i-humbleicons-times" @click="removeBox(box.id)" size="md" color="error" variant="solid" />
         </div>
       </div>
 
@@ -181,7 +236,7 @@ onUnmounted(() => {
             <h1 class="text-center font-semibold tracking-wide">Input Containter Name Here:</h1>
             <input class="px-3 mx-2 border rounded-xl border-green-800" v-model="boxNameInput" type="text" required>
             <div class="flex flex-row">
-              <UButton class="my-2 mx-auto" label="Submit" @click="addBox" />
+              <UButton class="my-2 mx-auto" label="Submit" :disabled="!editAccess || !validName" @click="addBox" />
               <UButton class="my-2 mx-auto" label="Cancel" color="error" @click="openDrawer = false" />
             </div>
           </div>
@@ -189,51 +244,90 @@ onUnmounted(() => {
       </UDrawer>
       
       <UDrawer :handle="false" should-scale-background>
-        <UButton class="inline" label="Inventory Audit Log" color="neutral" variant="subtle"/>
+        <UButton class="inline mb-2" label="Inventory Audit Log" color="neutral" variant="subtle"/>
         <template #content>
-          <div class="my-1 mx-2" v-for="audits in auditLogs" :key="audits.name">
+          <div class="my-1 mb- mx-2" v-for="audits in paginatedAudits" :key="audits.name">
             <p class="block font-light text-md tracking-tight leading-none">
-              <span class="font-bold">{{ audits.name }}</span> {{ audits.action }} '{{ audits.container?.name }}''
+              <span class="font-bold">{{ audits.name }}</span> {{ audits.action }} <span v-if="audits.container !== null">'{{ audits.container?.name }}'</span>
             </p>
             <p class="font-thin tracking-wide text-sm text-gray-600">
               Logged at {{ audits.logTime.toLocaleDateString() }} at {{ audits.logTime.toLocaleTimeString() }}
             </p>
+          </div>
+          <div class="flex justify-center mt-4 mb-2">
+            <UPagination v-model:page="auditPage" :items-per-page="itemsPerPage" :total="sortedAudit.length"/>
           </div>
         </template>
       </UDrawer>
 
       <UModal
         title="Are you sure?"
-        v-model:open="openModel1st"
+        v-model:open="openContainer1st"
         :close="{
           color: 'error',
           variant: 'outline',
           class: 'rounded-full'
         }">
 
-        <UButton class="inline my-2" @click="openModel1st = true" label="Clear Inventory" color="error" variant="solid"/>
+        <UButton class="inline mb-2" @click="openContainer1st = true" label="Clear Inventory" color="error" variant="solid"/>
 
         <template #body>
           <div class="flex flex-row">
             <UModal
               title="Positive?"
-              v-model:open="openModel2nd"
+              v-model:open="openContainer2nd"
               :close="{
                 color: 'error',
                 variant: 'outline',
                 class: 'rounded-full'
               }">
 
-              <UButton class="mx-auto" @click="openModel2nd = true" variant="solid" color="error" label="Yes, I'm sure" />
+              <UButton class="mx-auto" @click="openContainer2nd = true" variant="solid" color="error" label="Yes, I'm sure" />
 
               <template #body>
                 <div class="flex flex-row">
-                  <UButton class="mx-auto" @click="clearInventory" variant="solid" color="error" label="Absolutely" />
-                  <UButton class="mx-auto" @click="openModel1st = false, openModel2nd = false" variant="subtle" color="neutral" label="Nevermind" />
+                  <UButton class="mx-auto" @click="clearInventory" :disabled="editAccess" variant="solid" color="error" label="Absolutely" />
+                  <UButton class="mx-auto" @click="openContainer1st = false, openContainer2nd = false" variant="subtle" color="neutral" label="Nevermind" />
                 </div>
               </template>
             </UModal>
-            <UButton class="mx-auto" @click="openModel1st = false" variant="subtle" color="neutral" label="Cancel" />
+            <UButton class="mx-auto" @click="openContainer1st = false" variant="subtle" color="neutral" label="Cancel" />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        title="Are you sure?"
+        v-model:open="openAudit1st"
+        :close="{
+          color: 'error',
+          variant: 'outline',
+          class: 'rounded-full'
+        }">
+
+        <UButton class="inline mb-2" @click="openAudit1st = true" label="Clear Audit Logs" color="error" variant="solid"/>
+
+        <template #body>
+          <div class="flex flex-row">
+            <UModal
+              title="Affirmative?"
+              v-model:open="openAudit2nd"
+              :close="{
+                color: 'error',
+                variant: 'outline',
+                class: 'rounded-full'
+              }">
+
+              <UButton class="mx-auto" @click="openAudit2nd = true" variant="solid" color="error" label="Yes..." />
+
+              <template #body>
+                <div class="flex flex-row">
+                  <UButton class="mx-auto" @click="clearAuditLogs" :disabled="!editAccess" variant="solid" color="error" label="YES" />
+                  <UButton class="mx-auto" @click="openAudit1st = false, openAudit2nd = false" variant="subtle" color="neutral" label="Nevermind" />
+                </div>
+              </template>
+            </UModal>
+            <UButton class="mx-auto" @click="openAudit1st = false" variant="subtle" color="neutral" label="Cancel" />
           </div>
         </template>
       </UModal>
