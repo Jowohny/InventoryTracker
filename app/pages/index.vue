@@ -33,6 +33,7 @@ let auditLogs = ref<Audit[]>([])
 const editAccess = ref(false)
 const validName = ref(false)
 const boxNameInput = ref('')
+const openRequired = ref(false)
 const openDrawer = ref(false)
 const openContainer1st = ref(false)
 const openContainer2nd = ref(false)
@@ -75,7 +76,7 @@ watch(boxNameInput, (vName) => {
   validName.value = vName.trim().length > 2;
 })
 
-const toolTipMessage = computed(() => {
+const fieldRequired = computed(() => {
   if (!editAccess.value && !validName.value) {
     return "Please enter a username and a valid container name.";
   } else if (!editAccess.value) {
@@ -116,29 +117,33 @@ const removeBox = (id: number) => {
 }
 
 const addBox = () => {
-  const boxFilter = boxes.value.filter(box => (box.name.toLowerCase().trim()).includes(boxNameInput.value.toLowerCase().trim()))
+  if (validName.value && editAccess.value) {
+    const boxFilter = boxes.value.filter(box => (box.name.toLowerCase().trim()).includes(boxNameInput.value.toLowerCase().trim()))
 
-  if(boxFilter.length > 0) {
-    const newBox: Box = {
-      id: Date.now(),
-      name: `${boxNameInput.value} (${boxFilter.length})`,
-      created: new Date(Date.now())
-    }  
-    boxes.value.push(newBox)
-    addAuditEntry('addContainer', newBox)
-  } else {
-    const newBox: Box = {
-      id: Date.now(),
-      name: boxNameInput.value,
-      created: new Date(Date.now())
+    if(boxFilter.length > 0) {
+        const newBox: Box = {
+        id: Date.now(),
+        name: `${boxNameInput.value} (${boxFilter.length})`,
+        created: new Date(Date.now())
+        }  
+        boxes.value.push(newBox)
+        addAuditEntry('addContainer', newBox)
+    } else {
+        const newBox: Box = {
+        id: Date.now(),
+        name: boxNameInput.value,
+        created: new Date(Date.now())
+        }
+        boxes.value.push(newBox)  
+        addAuditEntry('addContainer', newBox)
     }
-    boxes.value.push(newBox)  
-    addAuditEntry('addContainer', newBox)
-  }
 
-  boxNameInput.value = ''
-  $locally.setItem('boxes', boxes.value)
-  openDrawer.value = false
+    boxNameInput.value = ''
+    $locally.setItem('boxes', boxes.value)
+    openDrawer.value = false
+  } else {
+    openRequired.value = true
+  }
 }
 
 const clearInventory = () => {
@@ -221,6 +226,10 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <NuxtLink to="/categoricalAddons" class="flex justify-center">
+        <UButton class="mb-2 block" label="Add Organizational Categories" color="info" variant="subtle"/>
+      </NuxtLink>
+
       <UDrawer class="mb-2" :handle="false" should-scale-background>
         <UButton class="inline" label="View Total Inventory" color="neutral" variant="subtle"/>
           <template #content>
@@ -241,9 +250,14 @@ onUnmounted(() => {
             <h1 class="text-center font-semibold tracking-wide">Input Containter Name Here:</h1>
             <input class="px-3 mx-2 border rounded-xl border-green-800" v-model="boxNameInput" type="text" required>
             <div class="flex flex-row">
-              <UTooltip class="my-2 mx-auto border" :delay-duration="0" :text="toolTipMessage">
-                <UButton label="Submit" :disabled="!editAccess || !validName" @click="addBox" />
-              </UTooltip>
+              <UModal v-model:open="openRequired" class="my-2 mx-auto border">
+                <UButton label="Submit" @click="addBox"/>
+                <template #content>
+                    <p class="text-center text-xl font-light tracking-wide mb-1 mt-2 leading-none">Required Input Field(s):</p>
+                    <p class="text-center text-sm font-light tracking-wide mb-2 mt-0">{{ fieldRequired }}</p>
+                  <UButton class="mx-auto mb-2" label="Understood" variant="subtle" color="warning" @click="openRequired = false"/>
+                </template>
+              </UModal>
               <UButton class="my-2 mx-auto" label="Cancel" color="error" @click="openDrawer = false" />
             </div>
           </div>
