@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 const { $locally } = useNuxtApp();
 
 interface BoxItem {
@@ -79,6 +78,17 @@ watch(userNameInput, (user) => {
 
 watch(boxNameInput, (vName) => {
   validName.value = vName.trim().length > 2;
+})
+
+const toolTipMessage = computed(() => {
+  if (!editAccess.value && !validName.value) {
+    return "Please enter a username and a valid container name.";
+  } else if (!editAccess.value) {
+    return "Please enter a username to make edits.";
+  } else if (!validName.value) {
+    return "Container name must be at least 3 characters long.";
+  }
+  return "";
 });
 
 onMounted(() => {
@@ -236,7 +246,9 @@ onUnmounted(() => {
             <h1 class="text-center font-semibold tracking-wide">Input Containter Name Here:</h1>
             <input class="px-3 mx-2 border rounded-xl border-green-800" v-model="boxNameInput" type="text" required>
             <div class="flex flex-row">
-              <UButton class="my-2 mx-auto" label="Submit" :disabled="!editAccess || !validName" @click="addBox" />
+              <UTooltip class="my-2 mx-auto border" :delay-duration="0" :text="toolTipMessage">
+                <UButton label="Submit" :disabled="!editAccess || !validName" @click="addBox" />
+              </UTooltip>
               <UButton class="my-2 mx-auto" label="Cancel" color="error" @click="openDrawer = false" />
             </div>
           </div>
