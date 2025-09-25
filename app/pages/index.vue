@@ -141,9 +141,10 @@ const addBox = () => {
     boxNameInput.value = ''
     $locally.setItem('boxes', boxes.value)
     openDrawer.value = false
+		openRequired.value = false
   } else {
-    openRequired.value = true
-  }
+		openRequired.value = true
+	}
 }
 
 const clearInventory = () => {
@@ -226,10 +227,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <NuxtLink to="/categoricalAddons" class="flex justify-center">
-        <UButton class="mb-2 block" label="Add Organizational Categories" color="info" variant="subtle"/>
-      </NuxtLink>
-
       <UDrawer class="mb-2" :handle="false" should-scale-background>
         <UButton class="inline" label="View Total Inventory" color="neutral" variant="subtle"/>
           <template #content>
@@ -253,8 +250,8 @@ onUnmounted(() => {
               <UModal v-model:open="openRequired" class="my-2 mx-auto border">
                 <UButton label="Submit" @click="addBox"/>
                 <template #content>
-                    <p class="text-center text-xl font-light tracking-wide mb-1 mt-2 leading-none">Required Input Field(s):</p>
-                    <p class="text-center text-sm font-light tracking-wide mb-2 mt-0">{{ fieldRequired }}</p>
+									<p class="text-center text-xl font-light tracking-wide mb-1 mt-2 leading-none">Required Input Field(s):</p>
+									<p class="text-center text-sm font-light tracking-wide mb-2 mt-0">{{ fieldRequired }}</p>
                   <UButton class="mx-auto mb-2" label="Understood" variant="subtle" color="warning" @click="openRequired = false"/>
                 </template>
               </UModal>
@@ -307,7 +304,7 @@ onUnmounted(() => {
 
               <template #body>
                 <div class="flex flex-row">
-                  <UButton class="mx-auto" @click="clearInventory" :disabled="editAccess" variant="solid" color="error" label="Absolutely" />
+                  <UButton class="mx-auto" @click="clearInventory" :disabled="!editAccess" variant="solid" color="error" label="Absolutely" />
                   <UButton class="mx-auto" @click="openContainer1st = false, openContainer2nd = false" variant="subtle" color="neutral" label="Nevermind" />
                 </div>
               </template>
@@ -352,6 +349,11 @@ onUnmounted(() => {
           </div>
         </template>
       </UModal>
+
+			<NuxtLink to="/categoricalAddons" class="flex justify-center">
+        <UButton class="mb-2 block" label="Add Organizational Categories" color="info" variant="subtle"/>
+      </NuxtLink>
+
     </div>
   </UApp>
 </template>
