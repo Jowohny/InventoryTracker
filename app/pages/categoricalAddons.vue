@@ -50,6 +50,36 @@ watch(radioValueType, (value) => {
     }
 });
 
+onMounted(() => {
+  try {
+    const storedCategories = $locally.getItem('categories');
+    
+    if (storedCategories && Array.isArray(storedCategories)) {
+      // 1. Safely assign the data
+      organizationLists.value = storedCategories as NestedOrganization[];
+
+      // 2. ONLY THEN populate the UI lists
+      radioGroupBrand.value = organizationLists.value.map(item => ({
+        label: item.brand,
+        value: item.brand
+      }));
+      
+    }
+  } catch (e) {
+    // If parsing fails, log the error and ensure the UI starts empty.
+    console.error("Failed to load or parse categories from storage:", e);
+    organizationLists.value = [];
+    radioGroupBrand.value = [];
+  }
+});
+
+onUnmounted(() => {
+  if (organizationLists.value.length > 0) {
+    $locally.setItem('categories', organizationLists.value)
+  }
+});
+
+
 const items = ref<AccordionItem[]>([
   {
     label: 'Brand',
